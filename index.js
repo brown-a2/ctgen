@@ -2,10 +2,10 @@
 
 var chalk = require('chalk')
 var inquirer = require('inquirer')
-var exec = require('child_process').exec
 var fs = require('fs')
 var path = require('path')
 var yml = require('js-yaml')
+var args = require('yargs').argv
 
 // Initialise a config variable
 var config
@@ -18,6 +18,80 @@ function camelize (str) {
     if (+match === 0) return '' // or if (/\s+/.test(match)) for white spaces
     return index === 0 ? match.toLowerCase() : match.toUpperCase()
   })
+}
+
+// If ctgen hasn't been installed then this will set up the config
+if (args.init) {
+  console.log(chalk.blue('Initialising ctgen...'))
+  // initQuestions = [
+  //   {
+  //     type: 'input',
+  //     name: 'projectName',
+  //     message: 'What is your project called?',
+  //     default: 'My New Project',
+  //     validate: function (value) {
+  //       var pass = value.length > 0
+  //       if (pass) return true
+  //       return 'Project name cannot be empty'
+  //     }
+  //   },
+  //   {
+  //     type: 'input',
+  //     name: 'projectDesc',
+  //     message: 'Please describe your project',
+  //     default: 'My New Project',
+  //     validate: function (value) {
+  //       var pass = value.length > 0
+  //       if (pass) return true
+  //       return 'Project description cannot be empty'
+  //     }
+  //   },
+  //   {
+  //     type: 'input',
+  //     name: 'authorName',
+  //     message: 'What is your Full Name?',
+  //     validate: function (value) {
+  //       var pass = value.length > 0
+  //       if (pass) return true
+  //       return 'Author name cannot be empty'
+  //     }
+  //   },
+  //   {
+  //     type: 'input',
+  //     name: 'authorGitUrl',
+  //     message: 'What is your git username (can be github, bitbucket, gitlab etc....)?',
+  //     validate: function (value) {
+  //       var pass = value.length > 0
+  //       if (pass) return true
+  //       return 'Git username cannot be empty'
+  //     }
+  //   },
+  //   {
+  //     type: 'confirm',
+  //     name: 'onlyDeveloper',
+  //     message: 'Are there any other devlopers on this project?',
+  //     default: false
+  //   },
+  //   {
+  //     type: 'confirm',
+  //     name: 'maintainRegister',
+  //     message: 'Do you want ctgen to automatically maintain a component register?',
+  //     default: true
+  //   }
+  // ]
+  fs.stat(path.join(__dirname, '/clarity.yml'), function (err, stat) {
+    if (err === null) {
+      console.log(chalk.red('clarity.yml detected!\nInstallation aborted, if you wish to reconfigure please delete clarity.yml and re-run.\n\n'))
+      // Kill the process with errors
+      process.exit(1)
+    } else if (err.code === 'ENOENT') {
+      createFile('root', 'clarity.yml.scaf')
+      console.error(chalk.blue('generating clarity.yml.scaf file'))
+      console.error(chalk.green('clarity.yml.scaff created. Please rename to clarity.yml and ensure that it is in your .gitignore file'))
+      // Kill the process with no errors
+      process.exit(0)
+    }
+  }) 
 }
 
 // 1: User types 'ctgen' the welecome message is immediately displayed
@@ -33,7 +107,7 @@ fs.stat(path.join(__dirname, '/clarity.yml'), function (err, stat) {
     config = yml.safeLoad(fs.readFileSync(path.join(__dirname, '/clarity.yml'), 'utf8'))
     questionTime()
   } else if (err.code === 'ENOENT') {
-    console.error(chalk.red('clarity.yml not found. Please add one to the root of your project. A template can be found at https://git.io/v5Tt2 \nProcess aborted with errors'))
+    console.error(chalk.red('clarity.yml not found. Please run this package again but add "--init" to the end'))
     process.exit(1)
   }
 })
@@ -88,36 +162,44 @@ var questionTime = function () {
   })
 }
 
-var createFile = function (fileName, componentMeta, type, answers) {
+var createFile = function (genType, fileName, componentMeta, fileType, answers) {
   // Tell the user what is happening
   console.log(chalk.blue('\rGenerating file from', fileName, '...'))
   // Bring in the scaffold file
   var scaffold = path.join(__dirname, '/scaffold/', fileName)
-  var processed = fs.readFile(scaffold, 'utf8', function (err, data) {
+  fs.readFile(scaffold, 'utf8', function (err, data) {
     if (err) return console.log(chalk.red(err))
-    // Replace %cname% with component name in dashed format
-    var result = data.replace(/%cname%/g, componentMeta.name)
-    // Replace %ccname% with component name in camelCase format
-    result = result.replace(/%namecc%/g, componentMeta.namecc)
-    // Replace %classes% with the correct classes string
-    result = result.replace(/%classes%/g, componentMeta.classes)
+    console.log('genType is', genType)
+    if (genType === 'root') {
+      console.log('filename detected as', fileName)
+      fs.writeFile(path.join(__dirname, fileName), data, function (err) {
+        if (err) return console.log(chalk.red(err))
+      })
+    } else {
+      // Replace %cname% with component name in dashed format
+      var result = data.replace(/%cname%/g, componentMeta.name)
+      // Replace %ccname% with component name in camelCase format
+      result = result.replace(/%namecc%/g, componentMeta.namecc)
+      // Replace %classes% with the correct classes string
+      result = result.replace(/%classes%/g, componentMeta.classes)
 
-    if (type === 'doc') {
-      var d = new Date()
-      result = result.replace(/%cfname%/g, answers.componentName)
-      result = result.replace(/%cdesc%/g, answers.componentDesc)
-      result = result.replace(/%cauthor%/g, config.author.name)
-      result = result.replace(/%cagithub%/g, config.author.giturl)
-      result = (answers.usesJavaScript) ? result.replace(/%has_js%/g, true) : result.replace(/%has_js%/g, false)
-      // BUG: getMonth() has returned the wrong month.
-      result = result.replace(/%creationdate%/g, d.getDate() + '/' + (d.getMonth() + 1) + '/' + d.getFullYear())
+      if (fileType === 'doc') {
+        var d = new Date()
+        result = result.replace(/%cfname%/g, answers.componentName)
+        result = result.replace(/%cdesc%/g, answers.componentDesc)
+        result = result.replace(/%cauthor%/g, config.author.name)
+        result = result.replace(/%cagithub%/g, config.author.giturl)
+        result = (answers.usesJavaScript) ? result.replace(/%has_js%/g, true) : result.replace(/%has_js%/g, false)
+        // BUG: getMonth() has returned the wrong month.
+        result = result.replace(/%creationdate%/g, d.getDate() + '/' + (d.getMonth() + 1) + '/' + d.getFullYear())
+      }
+
+      var compiledFileName = (fileType === 'view') ? fileName.replace('ext', config.defaults.viewType) : fileName
+
+      fs.writeFile(path.join(__dirname, '/src/components/' + componentMeta.name + '/' + compiledFileName), result, function (err) {
+        if (err) return console.log(chalk.red(err))
+      })
     }
-
-    var compiledFileName = (type === 'view') ? fileName.replace('ext', config.defaults.viewType) : fileName
-
-    fs.writeFile(path.join(__dirname, '/src/components/' + componentMeta.name + '/' + compiledFileName), result, function (err) {
-      if (err) return console.log(chalk.red(err))
-    })
   })
   return console.log(chalk.green('Done'))
 }
@@ -139,17 +221,17 @@ var fileGen = function (answers) {
   if (!fs.existsSync(componentFolder)) fs.mkdirSync(componentFolder)
   // 5: The following files are created in that folder
   // - view.ext
-  createFile('view.ext', componentMeta, 'view', answers)
+  createFile('component', 'view.ext', componentMeta, 'view', answers)
   // - style.styl
-  createFile('style.styl', componentMeta)
+  createFile('component', 'style.styl', componentMeta)
   // - script.js (if the user answered yes to Q5)
-  if (answers.usesJavaScript) createFile('rename_me.js', componentMeta)
+  if (answers.usesJavaScript) createFile('component', 'rename_me.js', componentMeta)
   // - style.print.styl (if the user answered yes to Q6)
-  if (answers.createPrintSheets) createFile('style.print.styl', componentMeta)
+  if (answers.createPrintSheets) createFile('component', 'style.print.styl', componentMeta)
   // - style.ie.styl (if the user answered yes to Q7)
-  if (answers.createIESheets) createFile('style.ie.styl', componentMeta)
+  if (answers.createIESheets) createFile('component', 'style.ie.styl', componentMeta)
   // - component.json (This works a little differently and takes the answers as well as the componentMeta data)
-  createFile('component.json', componentMeta, 'doc', answers)
+  createFile('component', 'component.json', componentMeta, 'doc', answers)
   // - finish up
   setTimeout(function () {
     finishUp(componentName, answers, genReg())

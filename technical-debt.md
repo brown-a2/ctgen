@@ -22,3 +22,5 @@ Nice to have: [NTH]
 4. AF: [NTH] Add basic scaffolding tool to project
 
 ## Issues
+
+1. Init is not working. I think I'll need to sort the index.js file out to be more method based as it's in dire need of refactoring and I think it's starting to cause issues.
