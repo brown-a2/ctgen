@@ -2,7 +2,6 @@
 
 var chalk = require('chalk')
 var inquirer = require('inquirer')
-var exec = require('child_process').exec
 var fs = require('fs')
 var path = require('path')
 var yml = require('js-yaml')
@@ -92,8 +91,8 @@ var createFile = function (fileName, componentMeta, type, answers) {
   // Tell the user what is happening
   console.log(chalk.blue('\rGenerating file from', fileName, '...'))
   // Bring in the scaffold file
-  var scaffold = path.join(__dirname, '/scaffold/', fileName)
-  var processed = fs.readFile(scaffold, 'utf8', function (err, data) {
+  var scaffold = path.join(__dirname, '/component-scaffold/', fileName)
+  fs.readFile(scaffold, 'utf8', function (err, data) {
     if (err) return console.log(chalk.red(err))
     // Replace %cname% with component name in dashed format
     var result = data.replace(/%cname%/g, componentMeta.name)
@@ -184,7 +183,7 @@ var genReg = function () {
  // Generate a HMTL table row with all the component data
   var createRows = function (obj) {
     var jsStat = (obj.has_js) ? 'yes' : 'no'
-    var hasTicket = (obj.creation_ticket) ? '<a href="https://dsdmoj.atlassian.net/browse/' + obj.creation_ticket + '">Jira Link</a>' : 'No ticket specified'
+    var hasTicket = (obj.creation_ticket) ? '<a href="obj.creation_ticket">Ticket link</a>' : 'No ticket specified'
     return ('<tr><td>' + obj.name + '</td><td>' + obj.version + '</td><td>' + hasTicket + '</td><td><a href="http://github.com/' + obj.creator.github_username + '">' + obj.creator.name + '</a></td><td>' + obj.description + '</td><td>' + jsStat + '</td></tr>')
   }
 
